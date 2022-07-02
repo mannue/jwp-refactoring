@@ -3,14 +3,11 @@ package kitchenpos.ui;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import kitchenpos.application.TableService;
-import kitchenpos.domain.Order;
 import kitchenpos.domain.OrderTable;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
-import org.mockito.Mock;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
-import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.http.HttpStatus;
@@ -19,7 +16,6 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.mock.web.MockHttpServletResponse;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
-import org.springframework.test.web.servlet.ResultActions;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 
@@ -28,8 +24,10 @@ import java.net.URI;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 
 @SpringBootTest
 @AutoConfigureMockMvc
@@ -68,6 +66,46 @@ class TableRestControllerTest {
         // Then
         OrderTable table = 테이블_생성(생성_요청_결과);
         방문한_손님_수(table, ZERO);
+    }
+
+    /**
+     * Given : 저장된 주문 테이블이 있고
+     * When : 저장된 주문 테이블 id 와 업데이트할 주문 테이블을 입력시
+     * Then : 정상적으로 변경된다.
+     */
+    @DisplayName("빈테이블로 변경하기")
+    @Test
+    void changeEmptyTableTest() throws Exception {
+        // Given
+        OrderTable orderTable = new OrderTable();
+        orderTable.setId(1L);
+        when(tableService.create(any())).thenReturn(orderTable);
+        final MockHttpServletResponse 생성_요청_결과 = 주문_테이블_생성_요청(new OrderTable());
+        OrderTable table = 테이블_생성(생성_요청_결과);
+
+        // When
+        OrderTable changeTable = new OrderTable();
+        changeTable.setId(table.getId());
+        changeTable.setEmpty(true);
+        when(tableService.changeEmpty(eq(table.getId()), any())).thenReturn(changeTable);
+        final MockHttpServletResponse 빈_테이블_로_상태_변경_결과 = 빈_테이블_로_상태_변경(table.getId(), new OrderTable());
+
+        // Then
+        빈_테이블_로_변경_완료(빈_테이블_로_상태_변경_결과);
+    }
+
+    private void 빈_테이블_로_변경_완료(MockHttpServletResponse response) throws UnsupportedEncodingException, JsonProcessingException {
+        assertThat(HttpStatus.valueOf(response.getStatus())).isEqualTo(HttpStatus.OK);
+        OrderTable orderTable = objectMapper.readValue(response.getContentAsString(), OrderTable.class);
+        assertThat(orderTable.isEmpty()).isTrue();
+    }
+
+    private MockHttpServletResponse 빈_테이블_로_상태_변경(Long id, OrderTable orderTable) throws Exception {
+        final String body = objectMapper.writeValueAsString(orderTable);
+        MvcResult mvcResult = this.mockMvc.perform(put(String.format("/api/tables/%d/empty",id))
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(body)).andReturn();
+        return  mvcResult.getResponse();
     }
 
     private void 방문한_손님_수(OrderTable table, int expectedResult)  {
