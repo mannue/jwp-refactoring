@@ -16,7 +16,9 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.mock.web.MockHttpServletResponse;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 
 import java.io.UnsupportedEncodingException;
@@ -92,6 +94,54 @@ class TableRestControllerTest {
 
         // Then
         빈_테이블_로_변경_완료(빈_테이블_로_상태_변경_결과);
+    }
+
+    @PutMapping("/api/tables/{orderTableId}/number-of-guests")
+    public ResponseEntity<OrderTable> changeNumberOfGuests(
+            @PathVariable final Long orderTableId,
+            @RequestBody final OrderTable orderTable
+    ) {
+        return ResponseEntity.ok()
+                .body(tableService.changeNumberOfGuests(orderTableId, orderTable))
+                ;
+    }
+
+    /**
+     *  When : 인원수를 변경하면
+     *  Then : 저장적으로 변경된다.
+     */
+    @DisplayName("인원 변경 테스트")
+    @Test
+    void changeNumberOfGuestsTest() throws Exception {
+        // Given
+        OrderTable orderTable = new OrderTable();
+        orderTable.setId(1L);
+        when(tableService.create(any())).thenReturn(orderTable);
+        final MockHttpServletResponse 생성_요청_결과 = 주문_테이블_생성_요청(new OrderTable());
+        OrderTable table = 테이블_생성(생성_요청_결과);
+
+        // When
+        OrderTable changeTable = new OrderTable();
+        changeTable.setId(table.getId());
+        changeTable.setNumberOfGuests(4);
+        when(tableService.changeNumberOfGuests(eq(table.getId()),any())).thenReturn(changeTable);
+        final MockHttpServletResponse 인원_수_변경_결과 = 테이블_인원_변경(orderTable.getId(), changeTable);
+
+        인원_변경_완료(인원_수_변경_결과,4);
+    }
+
+    private void 인원_변경_완료(MockHttpServletResponse response, int expectedResult) throws UnsupportedEncodingException, JsonProcessingException {
+        assertThat(HttpStatus.valueOf(response.getStatus())).isEqualTo(HttpStatus.OK);
+        OrderTable orderTable = objectMapper.readValue(response.getContentAsString(), OrderTable.class);
+        assertThat(orderTable.getNumberOfGuests()).isEqualTo(expectedResult);
+    }
+
+    private MockHttpServletResponse 테이블_인원_변경(Long id, OrderTable changeTable) throws Exception {
+        final String body = objectMapper.writeValueAsString(changeTable);
+        MvcResult mvcResult = this.mockMvc.perform(put(String.format("/api/tables/%d/number-of-guests",id))
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(body)).andReturn();
+        return  mvcResult.getResponse();
     }
 
     private void 빈_테이블_로_변경_완료(MockHttpServletResponse response) throws UnsupportedEncodingException, JsonProcessingException {
