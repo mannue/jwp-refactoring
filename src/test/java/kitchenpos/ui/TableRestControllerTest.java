@@ -1,6 +1,7 @@
 package kitchenpos.ui;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import kitchenpos.application.TableService;
 import kitchenpos.domain.OrderTable;
@@ -16,20 +17,20 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.mock.web.MockHttpServletResponse;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
-import org.springframework.web.bind.annotation.PathVariable;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.PutMapping;
-import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.*;
 
 import java.io.UnsupportedEncodingException;
+import java.lang.reflect.Array;
 import java.net.URI;
+import java.util.Arrays;
+import java.util.List;
+import java.util.stream.Collectors;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.when;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
 
 @SpringBootTest
 @AutoConfigureMockMvc
@@ -128,6 +129,43 @@ class TableRestControllerTest {
         final MockHttpServletResponse 인원_수_변경_결과 = 테이블_인원_변경(orderTable.getId(), changeTable);
 
         인원_변경_완료(인원_수_변경_결과,4);
+    }
+
+    @GetMapping("/api/tables")
+    public ResponseEntity<List<OrderTable>> list() {
+        return ResponseEntity.ok()
+                .body(tableService.list())
+                ;
+    }
+    /**
+     * Given : 저장된 주문 테이블들이 있으며,
+     * When: 정보를 요청했을때
+     * Then : 등록된 주문 테이블 정보들을 반환한다.
+     */
+    @DisplayName("주문 테이블 리스트 확인")
+    @Test
+    void listTest() throws Exception {
+        // When
+        OrderTable firstTable = new OrderTable();
+        firstTable.setId(1L);
+        OrderTable secondTable = new OrderTable();
+        secondTable.setId(2L);
+
+        when(tableService.list()).thenReturn(Arrays.asList(firstTable, secondTable));
+        final MockHttpServletResponse 테이블_리스트_확인 = 테이블_리스트_정보_확인();
+
+        테이블_리스트(테이블_리스트_확인, Arrays.asList(firstTable.getId(), secondTable.getId()));
+    }
+
+    private void 테이블_리스트(MockHttpServletResponse response, List<Long> expectedResult) throws UnsupportedEncodingException, JsonProcessingException {
+        List<OrderTable> list = objectMapper.readValue(response.getContentAsString(),new TypeReference<List<OrderTable>>() {});
+        assertThat(list.stream().mapToLong(OrderTable::getId)).containsExactlyElementsOf(expectedResult);
+    }
+
+    private MockHttpServletResponse 테이블_리스트_정보_확인() throws Exception {
+        MvcResult mvcResult = this.mockMvc.perform(get("/api/tables")
+                .contentType(MediaType.APPLICATION_JSON)).andReturn();
+        return  mvcResult.getResponse();
     }
 
     private void 인원_변경_완료(MockHttpServletResponse response, int expectedResult) throws UnsupportedEncodingException, JsonProcessingException {
